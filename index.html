@@ -992,6 +992,12 @@
             overflow: visible !important; /* Allow dropdowns to pop out */
         }
 
+        body.is-mobile #plot-island.is-open,
+        body.is-mobile #plot-island.is-closing {
+            height: min(60vh, 460px) !important;
+            min-height: 280px !important;
+        }
+
         body.is-mobile #plot-island .plot-controls {
             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
             gap: 6px;
@@ -1076,7 +1082,7 @@
             border-radius: 4px !important;
             margin-top: 10px !important;
             display: block !important;
-            min-height: 0 !important; /* Remove min-height to allow square fit */
+            min-height: 180px !important;
         }
 
         .nav-btn {
@@ -3770,6 +3776,19 @@ function resizePlotCanvas() {
     const rect = plotCanvas.getBoundingClientRect();
     let cssW = Math.round(rect.width);
     let cssH = Math.round(rect.height);
+    if (isMobile && plotIsland) {
+        const islandRect = plotIsland.getBoundingClientRect();
+        const titleEl = plotIsland.querySelector('.plot-title');
+        const controlsEl = plotIsland.querySelector('.plot-controls');
+        const titleH = titleEl ? titleEl.getBoundingClientRect().height : 0;
+        const controlsH = controlsEl ? controlsEl.getBoundingClientRect().height : 0;
+        const style = getComputedStyle(plotIsland);
+        const padY = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+        const padX = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+        const gap = 8 * 2;
+        cssW = Math.max(0, Math.round(islandRect.width - padX));
+        cssH = Math.max(0, Math.round(islandRect.height - padY - titleH - controlsH - gap));
+    }
     
     // Fallback if rect is 0 or suspiciously small
     if (cssW < 10) cssW = plotCanvas.offsetWidth;
@@ -3779,12 +3798,12 @@ function resizePlotCanvas() {
     if (cssW < 10 && plotCanvas.parentElement) {
         const parentRect = plotCanvas.parentElement.getBoundingClientRect();
         cssW = Math.round(parentRect.width) - 40; 
-        cssH = Math.round(parentRect.height) - 150; 
+        cssH = Math.round(parentRect.height) - 120; 
     }
     
     // Ensure absolute minimums
     cssW = Math.max(isMobile ? 250 : 100, cssW);
-    cssH = Math.max(isMobile ? 150 : 100, cssH);
+    cssH = Math.max(isMobile ? 240 : 100, cssH);
 
     plotCanvas.style.width = cssW + "px";
     plotCanvas.style.height = cssH + "px";
@@ -4050,9 +4069,20 @@ function drawPlot() {
     }
 
     const isMobile = document.body.classList.contains('is-mobile');
+    const ticks = 4;
+    plotCtx.font = isMobile ? "12px monospace" : "13px monospace";
+    const baseLeft = isMobile ? 45 : 64;
+    let yLabelMax = 0;
+    for (let i = 0; i <= ticks; i++) {
+        const yVal = yMax - ((yMax - yMin) * i) / ticks;
+        const label = formatPlotValue(yVal);
+        const width = plotCtx.measureText(label).width;
+        if (width > yLabelMax) yLabelMax = width;
+    }
+    const leftMargin = Math.max(baseLeft, Math.ceil(yLabelMax + 14));
     const margin = isMobile 
-        ? { left: 45, right: 10, top: 10, bottom: 25 } 
-        : { left: 64, right: 28, top: 16, bottom: 28 };
+        ? { left: leftMargin, right: 10, top: 10, bottom: 25 } 
+        : { left: Math.max(64, Math.ceil(yLabelMax + 18)), right: 28, top: 16, bottom: 28 };
         
     const plotW = Math.max(1, w - margin.left - margin.right);
     const plotH = Math.max(1, h - margin.top - margin.bottom);
@@ -4062,7 +4092,6 @@ function drawPlot() {
     const xToPx = (v) => margin.left + (v - xMin) * xScale;
     const yToPx = (v) => margin.top + plotH - (v - yMin) * yScale;
 
-    const ticks = 4;
     plotCtx.strokeStyle = "rgba(255,255,255,0.08)";
     plotCtx.lineWidth = 1;
     for (let i = 1; i < ticks; i++) {
@@ -4088,7 +4117,6 @@ function drawPlot() {
     plotCtx.stroke();
 
     plotCtx.fillStyle = "#999";
-    plotCtx.font = "13px monospace";
     for (let i = 0; i <= ticks; i++) {
         const xVal = xMin + ((xMax - xMin) * i) / ticks;
         const yVal = yMax - ((yMax - yMin) * i) / ticks;
