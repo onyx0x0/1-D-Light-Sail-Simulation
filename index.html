@@ -3702,15 +3702,6 @@ function setupNumberControls() {
             setNumberInputValue(input, parseFloat(input.value));
         });
         input.addEventListener("blur", updateInputHold);
-        
-        // Fix for mobile Safari layout shift after keyboard close
-        input.addEventListener("blur", () => {
-             window.scrollTo(0, 0);
-             if (typeof updateViewportHeight === 'function') {
-                 setTimeout(updateViewportHeight, 60);
-                 setTimeout(updateViewportHeight, 300);
-             }
-        });
 
         input.addEventListener("wheel", (event) => {
             event.preventDefault();
@@ -3767,6 +3758,19 @@ function setupNumberControls() {
         btn.addEventListener("mouseleave", stop);
     });
     updateInputHold();
+
+    // Global fix for mobile Safari layout shift after keyboard close
+    // Applies to ALL inputs including those in overlays (Coupling, Extra Control)
+    document.addEventListener("blur", (e) => {
+        if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA")) {
+             window.scrollTo(0, 0);
+             if (typeof updateViewportHeight === 'function') {
+                 setTimeout(updateViewportHeight, 60);
+                 setTimeout(updateViewportHeight, 300);
+                 setTimeout(updateViewportHeight, 600);
+             }
+        }
+    }, true); // Capture phase to ensure it catches everything
 }
 
 setupNumberControls();
