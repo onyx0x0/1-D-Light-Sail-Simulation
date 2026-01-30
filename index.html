@@ -2419,26 +2419,6 @@
                     </div>
                 </div>
                 <div class="control-box">
-                    <label class="control-tip" data-tip="Manual override for beam spot radius at the sail (1/e^2), in meters.">Beam radius at sail (m)</label>
-                    <div class="number-wrap">
-                        <input type="number" id="beam-radius-input" min="0" max="10000" step="0.01" value="0" data-precision="auto">
-                        <div class="stepper">
-                            <button type="button" class="stepper-btn" data-dir="1">^</button>
-                            <button type="button" class="stepper-btn" data-dir="-1">v</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="control-box">
-                    <label class="control-tip" data-tip="Laser wavelength in nanometers. Affects diffraction-limited beam spread.">Wavelength (nm)</label>
-                    <div class="number-wrap">
-                        <input type="number" id="wavelength-input" min="200" max="2000" step="1" value="450" data-precision="0">
-                        <div class="stepper">
-                            <button type="button" class="stepper-btn" data-dir="1">^</button>
-                            <button type="button" class="stepper-btn" data-dir="-1">v</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="control-box">
                     <label id="div-label" class="control-tip" data-tip="Beam half-angle divergence in milliradians (manual unless diffraction-locked).">Beam Divergence (mrad)</label>
                     <div class="number-wrap">
                         <input type="number" id="div-input" min="0" max="10" step="0.000001" value="0.01" data-precision="auto">
@@ -2454,6 +2434,26 @@
                             <span class="toggle-track"></span>
                             <span class="toggle-knob"></span>
                         </label>
+                    </div>
+                </div>
+                <div class="control-box">
+                    <label class="control-tip" data-tip="Laser wavelength in nanometers. Affects diffraction-limited beam spread.">Wavelength (nm)</label>
+                    <div class="number-wrap">
+                        <input type="number" id="wavelength-input" min="200" max="2000" step="1" value="450" data-precision="0">
+                        <div class="stepper">
+                            <button type="button" class="stepper-btn" data-dir="1">^</button>
+                            <button type="button" class="stepper-btn" data-dir="-1">v</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="control-box">
+                    <label class="control-tip" data-tip="Manual override for beam spot radius at the sail (1/e^2), in meters.">Beam radius at sail (m)</label>
+                    <div class="number-wrap">
+                        <input type="number" id="beam-radius-input" min="0" max="10000" step="0.01" value="0" data-precision="auto">
+                        <div class="stepper">
+                            <button type="button" class="stepper-btn" data-dir="1">^</button>
+                            <button type="button" class="stepper-btn" data-dir="-1">v</button>
+                        </div>
                     </div>
                 </div>
                 <div class="control-box">
@@ -2520,6 +2520,16 @@
                         </div>
                     </div>
                 </div>
+                <div class="control-box">
+                    <label class="control-tip" data-tip="Total sailcraft mass in kilograms (sail + payload).">Total Mass (kg)</label>
+                    <div class="number-wrap">
+                        <input type="number" id="mass-input" min="0.0001" max="1" step="0.000001" value="0.001" data-precision="auto">
+                        <div class="stepper">
+                            <button type="button" class="stepper-btn" data-dir="1">^</button>
+                            <button type="button" class="stepper-btn" data-dir="-1">v</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="control-box" id="cm-box">
                     <label id="cm-label" class="control-tip" data-tip="Thrust coupling coefficient in N/MW (maps laser power to thrust).">Coupling Cm (N/MW)</label>
                     <div class="number-wrap">
@@ -2576,16 +2586,6 @@
                     </div>
                     <div class="toggle-subfield" id="irradiance-input-wrap">
                         <input type="number" id="irradiance-limit-input" min="0" max="1e13" step="1e6" value="8e9" data-precision="auto">
-                    </div>
-                </div>
-                <div class="control-box">
-                    <label class="control-tip" data-tip="Total sailcraft mass in kilograms (sail + payload).">Total Mass (kg)</label>
-                    <div class="number-wrap">
-                        <input type="number" id="mass-input" min="0.0001" max="1" step="0.000001" value="0.001" data-precision="auto">
-                        <div class="stepper">
-                            <button type="button" class="stepper-btn" data-dir="1">^</button>
-                            <button type="button" class="stepper-btn" data-dir="-1">v</button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -3702,6 +3702,16 @@ function setupNumberControls() {
             setNumberInputValue(input, parseFloat(input.value));
         });
         input.addEventListener("blur", updateInputHold);
+        
+        // Fix for mobile Safari layout shift after keyboard close
+        input.addEventListener("blur", () => {
+             window.scrollTo(0, 0);
+             if (typeof updateViewportHeight === 'function') {
+                 setTimeout(updateViewportHeight, 60);
+                 setTimeout(updateViewportHeight, 300);
+             }
+        });
+
         input.addEventListener("wheel", (event) => {
             event.preventDefault();
             if (input.disabled) return;
