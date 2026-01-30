@@ -37,6 +37,8 @@
             height: calc(var(--vh, 1vh) * 100);
             overflow: hidden;
             touch-action: none;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
         }
 
         :root {
@@ -784,6 +786,12 @@
 
             #controls-island .controls-panel {
                 width: 100%;
+            }
+
+            body.is-mobile input,
+            body.is-mobile select,
+            body.is-mobile textarea {
+                font-size: 16px;
             }
 
             #controls-island .control-grid {
