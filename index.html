@@ -2630,13 +2630,19 @@ const RHO0 = 1.225;                  // Sea level density (kg/m3) for visuals
 const W_FLOOR = 0.0001;                 // Turbulence/seeing floor for spot radius (m)
 const H0 = 48000;                    // Start altitude (m)
 const MAX_DV_PER_STEP = 5;           // Limit velocity change per substep (m/s)
-const MAX_SUBSTEPS = 120;            // Cap substeps per physics tick for stability
+const MAX_SUBSTEPS = 120;            // Base cap substeps per physics tick for stability
+const MAX_SUBSTEPS_THERMAL = 800;    // Allow more substeps when thermal stability needs it
 const DRAG_DT_SAFETY = 0.9;          // Safety factor for drag-stiff timestep limit
+const MAX_DTEMP_PER_STEP = 25;       // Limit temperature change per substep (K)
+const THERMAL_DT_SAFETY = 0.5;       // Safety factor for thermal stability timestep
 const ABLATION_PABS_OFF_MW = 0.001;  // Below this absorbed power, no particles
 const ABLATION_PABS_ON_MW = 0.01;    // At/above this absorbed power, max particles
 const ABLATION_PARTICLE_MAX = 200;   // Max particle count at threshold
 const ABLATION_PARTICLE_LIFE = 0.9;  // Base particle lifetime (s)
 const ABLATION_PARTICLE_SPREAD = Math.PI * 0.9; // Downward cone spread (radians)
+const EXPLOSION_PARTICLE_COUNT = 220;
+const EXPLOSION_PARTICLE_LIFE = 1.6;
+const EXPLOSION_PARTICLE_SPEED = 260;
 
 /**
  * STATE
@@ -2655,6 +2661,7 @@ let emissivity = EPS_RAD;
 let atmTransmissionZenith = ATM_TRANSMISSION_ZENITH;
 let absorptanceFromReflectance = true;
 let maxIrradianceLimit = I_MAX;
+let tempLimitK = T_MAX;
 let sailDiameter = DIAMETER;
 let sailRadius = RS;
 let sailArea = SAIL_AREA;
@@ -2691,6 +2698,12 @@ let plotDpr = window.devicePixelRatio || 1;
 const ablationParticles = [];
 let ablationSpawnAccumulator = 0;
 let ablationLastStamp = performance.now();
+const explosionParticles = [];
+let explosionPending = false;
+let explosionShock = 0;
+let explosionLastStamp = performance.now();
+let explosionOrigin = { x: 0, y: 0 };
+let sailFailed = false;
 
 // Canvas Setup
 const canvas = document.getElementById('simCanvas');
@@ -3162,6 +3175,7 @@ function resetSimulationState() {
     simPaused = false;
     statusText = "OK";
     simStarted = false;
+    sailFailed = false;
     simElapsed = 0;
     simAccumulator = 0;
     laserOn = false;
@@ -3179,6 +3193,9 @@ function resetSimulationState() {
     ablationParticles.length = 0;
     ablationSpawnAccumulator = 0;
     ablationLastStamp = performance.now();
+    explosionParticles.length = 0;
+    explosionPending = false;
+    explosionShock = 0;
     lastPhysResult = updatePhysics(0);
 }
 
@@ -3229,6 +3246,9 @@ function applyMissionPreset(key) {
     absorptanceFromReflectance = preset.absorptanceFromReflectance ?? absorptanceFromReflectance;
     emissivity = preset.emissivity ?? emissivity;
     atmTransmissionZenith = preset.transmission ?? atmTransmissionZenith;
+    if (Number.isFinite(preset.tempLimitK)) {
+        tempLimitK = preset.tempLimitK;
+    }
     divergenceLocked = useDiffractionBeam;
 
     setNumberInputValue(altitudeSlider, preset.startAltitude);
@@ -3288,9 +3308,9 @@ function clampValue(value, min, max) {
     return v;
 }
 
-function adjustNumberInput(input, dir) {
+function adjustNumberInput(input, dir, scale = 1) {
     if (!input) return;
-    const step = getStepValue(input);
+    const step = getStepValue(input) * Math.max(1, scale);
     const precision = getStepPrecision(input);
     const minAttr = parseFloat(input.getAttribute("min"));
     const maxAttr = parseFloat(input.getAttribute("max"));
@@ -3308,7 +3328,24 @@ function setupNumberControls() {
     numberInputs.forEach((input) => {
         input.addEventListener("input", () => {
             updateInputHold();
+            if (input === speedSlider) {
+                const minAttr = parseFloat(input.getAttribute("min"));
+                const maxAttr = parseFloat(input.getAttribute("max"));
+                const value = parseFloat(input.value);
+                if (Number.isFinite(value)) {
+                    const clamped = clampValue(value, minAttr, maxAttr);
+                    if (clamped !== value) {
+                        input.value = clamped;
+                    }
+                }
+            }
             if (input === altitudeSlider) {
+                const value = parseFloat(input.value);
+                if (!Number.isFinite(value) && input.value.trim() === "-") {
+                    input.value = "";
+                } else if (Number.isFinite(value) && value < 0) {
+                    input.value = "0";
+                }
                 applyStartAltitude(parseFloat(input.value));
             } else if (input === beamRadiusInput) {
                 if (beamRadiusSyncing) return;
@@ -3354,6 +3391,7 @@ function setupNumberControls() {
         let intervalId = null;
         let timeoutId = null;
         let speed = 150;
+        let holdTicks = 0;
         
         const stop = () => {
             if (timeoutId) clearTimeout(timeoutId);
@@ -3361,11 +3399,15 @@ function setupNumberControls() {
             intervalId = null;
             timeoutId = null;
             speed = 150;
+            holdTicks = 0;
         };
 
         const tick = (input, dir) => {
-            adjustNumberInput(input, dir);
-            speed = Math.max(20, speed * 0.85); // Accelerate
+            holdTicks += 1;
+            const accel = Math.min(256, Math.pow(1.15, holdTicks));
+            const scale = Math.max(1, Math.floor(accel));
+            adjustNumberInput(input, dir, scale);
+            speed = Math.max(12, speed * 0.9); // Accelerate
             if (intervalId) clearInterval(intervalId);
             intervalId = setInterval(() => tick(input, dir), speed);
         };
@@ -3375,7 +3417,8 @@ function setupNumberControls() {
             const input = btn.closest(".number-wrap")?.querySelector('input[type="number"]');
             if (input && !input.disabled) {
                 input.focus();
-                adjustNumberInput(input, dir); // Immediate change
+                holdTicks = 0;
+                adjustNumberInput(input, dir, 1); // Immediate change
                 timeoutId = setTimeout(() => {
                     intervalId = setInterval(() => tick(input, dir), speed);
                 }, 400); // Initial delay before repeating
@@ -4329,6 +4372,81 @@ function updateAndDrawAblationParticles(centerY, sailHalf) {
     ctx.restore();
 }
 
+function spawnExplosionParticles(originX, originY, color) {
+    explosionParticles.length = 0;
+    const rgb = color || { r: 255, g: 200, b: 120 };
+    for (let i = 0; i < EXPLOSION_PARTICLE_COUNT; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = EXPLOSION_PARTICLE_SPEED * (0.4 + Math.random() * 0.8);
+        const life = EXPLOSION_PARTICLE_LIFE * (0.6 + Math.random() * 0.8);
+        explosionParticles.push({
+            x: originX,
+            y: originY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life,
+            lifeMax: life,
+            size: 1.5 + Math.random() * 2.5,
+            r: Math.min(255, Math.round(rgb.r + Math.random() * 40)),
+            g: Math.min(255, Math.round(rgb.g + Math.random() * 40)),
+            b: Math.min(255, Math.round(rgb.b + Math.random() * 30))
+        });
+    }
+    explosionShock = 1;
+    explosionLastStamp = performance.now();
+}
+
+function updateAndDrawExplosionParticles() {
+    if (explosionParticles.length === 0 && explosionShock <= 0) return;
+    const now = performance.now();
+    const dt = Math.min(0.05, Math.max(0, (now - explosionLastStamp) / 1000));
+    explosionLastStamp = now;
+
+    if (explosionShock > 0) {
+        const shockRadius = 20 + (1 - explosionShock) * 160;
+        const shockAlpha = Math.max(0, Math.min(1, explosionShock));
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.strokeStyle = `rgba(255, 210, 140, ${0.6 * shockAlpha})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(explosionOrigin.x, explosionOrigin.y, shockRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255, 160, 80, ${0.12 * shockAlpha})`;
+        ctx.beginPath();
+        ctx.arc(explosionOrigin.x, explosionOrigin.y, shockRadius * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        explosionShock -= dt * 1.4;
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = explosionParticles.length - 1; i >= 0; i--) {
+        const p = explosionParticles[i];
+        if (dt > 0) {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vy += 80 * dt;
+            p.life -= dt;
+        }
+        if (p.life <= 0) {
+            explosionParticles.splice(i, 1);
+            continue;
+        }
+        const alpha = Math.max(0, Math.min(1, p.life / p.lifeMax));
+        ctx.strokeStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${alpha})`;
+        ctx.lineWidth = Math.max(1, p.size * 0.6);
+        const dx = (p.vx * 0.02);
+        const dy = (p.vy * 0.02);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - dx, p.y - dy);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
 // Bessel approximations (Cephes-like) to support optional Airy mode
 function besselJ0(x) {
     const ax = Math.abs(x);
@@ -4618,6 +4736,13 @@ function updateTelemetry(data) {
     };
 }
 
+function triggerFailure(reason) {
+    if (sailFailed) return;
+    sailFailed = true;
+    stopLaser(reason);
+    explosionPending = true;
+}
+
 function stopLaser(reason) {
     if (reason) statusText = reason;
     laserOn = false;
@@ -4626,6 +4751,7 @@ function stopLaser(reason) {
 }
 
 toggleBtn.onclick = () => {
+    if (sailFailed) return;
     if (simPaused && statusText !== "OK") {
         // allow restart after a failure by clearing pause manually
         simPaused = false;
@@ -4835,26 +4961,60 @@ function updatePhysics(dt) {
     if (dt > 0 && !isPaused()) {
         let remaining = dt;
         let steps = 0;
-        while (remaining > 0 && steps < MAX_SUBSTEPS) {
+        let maxSubstepsAllowed = MAX_SUBSTEPS;
+        while (remaining > 0 && steps < maxSubstepsAllowed) {
             const dataStart = computeForces();
             const accelAbs = Math.abs(dataStart.accel);
-            const minDt = remaining / (MAX_SUBSTEPS - steps);
             let subDt = remaining;
+            let maxDtForAccel = Infinity;
+            let maxDtForDrag = Infinity;
+            let maxDtForThermal = Infinity;
+            let maxDtForThermalStability = Infinity;
             if (accelAbs > 0) {
-                const maxDtForAccel = MAX_DV_PER_STEP / accelAbs;
+                maxDtForAccel = MAX_DV_PER_STEP / accelAbs;
                 subDt = Math.min(subDt, maxDtForAccel);
             }
             // Limit timestep when drag is stiff near terminal velocity.
             const vAbs = Math.abs(v);
+            const massSafe = Math.max(massKg, 1e-9);
             if (vAbs > 1e-6) {
-                const massSafe = Math.max(massKg, 1e-9);
                 const dragRate = (2 * Math.abs(dataStart.fDrag)) / (massSafe * vAbs);
                 if (dragRate > 0) {
-                    const maxDtForDrag = DRAG_DT_SAFETY / dragRate;
+                    maxDtForDrag = DRAG_DT_SAFETY / dragRate;
                     subDt = Math.min(subDt, maxDtForDrag);
                 }
             }
-            subDt = Math.max(subDt, minDt);
+            // Limit timestep for thermal stability.
+            const pAbsStart = absorptance * dataStart.pHit;
+            const tEnvStart = environmentTemp(dataStart.rho, dataStart.T);
+            const pRadStart = emissivity * SIGMA * (2 * sailArea) * (Math.pow(tempK, 4) - Math.pow(tEnvStart, 4));
+            const pAeroStart = AERO_K * Math.sqrt(Math.max(dataStart.rho, 0) / RN) * Math.pow(vAbs, 3);
+            const hConvStart = convectiveH(dataStart.rho);
+            const pConvStart = hConvStart * (2 * sailArea) * (dataStart.T - tempK);
+            const dTdtStart = (pAbsStart + pAeroStart + pConvStart - pRadStart) / (massSafe * CP);
+            if (Number.isFinite(dTdtStart) && Math.abs(dTdtStart) > 0) {
+                maxDtForThermal = MAX_DTEMP_PER_STEP / Math.abs(dTdtStart);
+                subDt = Math.min(subDt, maxDtForThermal);
+            }
+            const dPdT = -((2 * sailArea * hConvStart) + (4 * emissivity * SIGMA * (2 * sailArea) * Math.pow(Math.max(tempK, 0), 3)));
+            if (Number.isFinite(dPdT) && Math.abs(dPdT) > 0) {
+                maxDtForThermalStability = THERMAL_DT_SAFETY * (massSafe * CP) / Math.abs(dPdT);
+                subDt = Math.min(subDt, maxDtForThermalStability);
+            }
+
+            const maxDtThermalAllowed = Math.min(maxDtForThermal, maxDtForThermalStability);
+            if (Number.isFinite(maxDtThermalAllowed) && maxDtThermalAllowed > 0) {
+                const requiredSteps = Math.ceil(remaining / maxDtThermalAllowed);
+                if (requiredSteps > maxSubstepsAllowed) {
+                    maxSubstepsAllowed = Math.min(MAX_SUBSTEPS_THERMAL, Math.max(MAX_SUBSTEPS, requiredSteps));
+                }
+            }
+
+            const minDt = remaining / (maxSubstepsAllowed - steps);
+            const minSafe = Math.min(maxDtForAccel, maxDtForDrag, maxDtForThermal, maxDtForThermalStability);
+            if (minDt <= minSafe) {
+                subDt = Math.max(subDt, minDt);
+            }
 
             const vMid = v + 0.5 * dataStart.accel * subDt;
             const hMid = h + 0.5 * v * subDt;
@@ -4881,8 +5041,22 @@ function updatePhysics(dt) {
             const pAero = AERO_K * Math.sqrt(Math.max(dataMid.rho, 0) / RN) * Math.pow(Math.abs(vMid), 3);
             const hConv = convectiveH(dataMid.rho);
             const pConv = hConv * (2 * sailArea) * (dataMid.T - tempK);
-            const dTdt = (pAbs + pAero + pConv - pRad) / (massKg * CP);
-            tempK += dTdt * subDt;
+            const dTdt = (pAbs + pAero + pConv - pRad) / (massSafe * CP);
+            const nextTemp = tempK + dTdt * subDt;
+            if (Number.isFinite(tempLimitK) && nextTemp > tempLimitK) {
+                tempK = tempLimitK;
+                triggerFailure("FAILED: over-temp");
+                break;
+            }
+            if (!Number.isFinite(nextTemp) || nextTemp < 0) {
+                triggerFailure("FAILED: temp NaN");
+                break;
+            }
+            tempK = nextTemp;
+            if (!Number.isFinite(tempK)) {
+                triggerFailure("FAILED: temp NaN");
+                break;
+            }
 
             remaining -= subDt;
             steps += 1;
@@ -4890,10 +5064,13 @@ function updatePhysics(dt) {
         data = computeForces();
     }
 
-    if (!isPaused()) {
-        if (Number.isFinite(maxIrradianceLimit) && data.irradiance0 > maxIrradianceLimit) {
-            simPaused = true;
-            stopLaser("FAILED: over-irradiance");
+    if (!isPaused() && !sailFailed) {
+        if (!Number.isFinite(tempK) || tempK < 0) {
+            triggerFailure("FAILED: temp NaN");
+        } else if (Number.isFinite(tempLimitK) && tempK > tempLimitK) {
+            triggerFailure("FAILED: over-temp");
+        } else if (Number.isFinite(maxIrradianceLimit) && data.irradiance0 > maxIrradianceLimit) {
+            triggerFailure("FAILED: over-irradiance");
         } else if (data.epsilon > 0 && v > 0) {
             if (stopOnEscape) {
                 simPaused = true;
@@ -4949,6 +5126,13 @@ function draw(wEff, rho) {
     // 2. Camera setup (Sail is centered vertically)
     const centerY = height / 2;
     const sailVisualHalf = 40;
+
+    if (explosionPending) {
+        explosionPending = false;
+        explosionOrigin = { x: width / 2, y: centerY };
+        const beamRgb = wavelengthToRgb(LAMBDA);
+        spawnExplosionParticles(explosionOrigin.x, explosionOrigin.y, beamRgb);
+    }
     
       // 3. Draw Laser Beam (rendered as a near-parallel column at the sail)
     if (laserOn) {
@@ -5003,23 +5187,26 @@ function draw(wEff, rho) {
     }
 
     // 4. Draw Sail
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(width/2 - 40, centerY);
-    ctx.lineTo(width/2 + 40, centerY);
-    ctx.stroke();
-    
-    // Glow effect
-    if (laserOn && !isPaused()) {
-        const beamRgb = wavelengthToRgb(LAMBDA);
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = `rgb(${beamRgb.r}, ${beamRgb.g}, ${beamRgb.b})`;
+    if (!sailFailed) {
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(width/2 - 40, centerY);
+        ctx.lineTo(width/2 + 40, centerY);
         ctx.stroke();
-        ctx.shadowBlur = 0;
+        
+        // Glow effect
+        if (laserOn && !isPaused()) {
+            const beamRgb = wavelengthToRgb(LAMBDA);
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = `rgb(${beamRgb.r}, ${beamRgb.g}, ${beamRgb.b})`;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
     }
-
+    
     updateAndDrawAblationParticles(centerY, sailVisualHalf);
+    updateAndDrawExplosionParticles();
 
     // 5. Altitude Markers (Reference motion)
     ctx.fillStyle = "rgba(255,255,255,0.3)";
@@ -5201,16 +5388,16 @@ const tutorialSteps = [
     },
     {
         target: "#mission-escape-island",
-        msg: "The <strong>Mission Control</strong> (Bottom Right) lets you switch between preset configurations like 'XERIONYX' (Atmospheric) or 'STARSHOT' (Interstellar). You can also toggle whether the simulation stops upon reaching escape velocity. Click <strong>Learn More</strong> for mission details.",
+        msg: "The <strong>XERIONYX/STARSHOT</strong> toggle lets you switch between preset configurations like 'XERIONYX' (Atmospheric) or 'STARSHOT' (Interstellar). You can also toggle whether the simulation stops upon reaching Erath's escape velocity. Click <strong>Learn More</strong> for mission details.",
         learnMore: "mission"
     },
     {
         target: "#coupling-island",
-        msg: "The <strong>Coupling Control</strong> (Bottom Left) is a powerful feature. Instead of just setting a fixed laser power, you can automatically regulate the laser to maintain a target Sail Temperature, Peak Irradiance, or Power Hit."
+        msg: "The <strong>Coupling</strong> control is a powerful feature. Instead of just setting a fixed laser power, you can automatically regulate the laser power to maintain a target Sail Temperature, Peak Irradiance, P_Hit (Actual power hitting the sail) or the wavelength which the sail sees (great for STARSHOT near light speed mission where the light gets red-shifted)."
     },
     {
         target: "#controls-island",
-        msg: "The <strong>Main Controls</strong> (Bottom Center) give you manual command over the Laser (Power, Aperture, Wavelength) and Sail parameters (Diameter, Mass, Reflectance). You can also control the Simulation speed and start/stop the laser.",
+        msg: "The <strong>Main Controls</strong> give you manual command over the Laser (Power, Aperture, Wavelength) and Sail parameters (Diameter, Mass, Reflectance). You can also control the Simulation speed, start/stop the laser, and pause or restart.",
         learnMore: "main_controls"
     }
 ];
