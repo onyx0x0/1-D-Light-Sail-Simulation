@@ -5767,6 +5767,7 @@ const tutorialLearnMore = document.getElementById('tutorial-learn-more');
 const tutorialInfoBox = document.getElementById('tutorial-info-box');
 const tutorialInfoContent = document.getElementById('tutorial-info-content');
 const tutorialInfoClose = document.getElementById('tutorial-info-close');
+const tutorialInfoScroll = document.querySelector('.tutorial-info-scroll');
 let animFrame = null;
 let animFrame2 = null;
 let animFrame3 = null;
@@ -5817,7 +5818,7 @@ const tutorialSteps = [
 
 let currentStepIndex = -1;
 
-function updateTutorialStep() {
+function updateTutorialStep(animate = true) {
     const step = tutorialSteps[currentStepIndex];
     if (!step) return;
 
@@ -5855,9 +5856,8 @@ function updateTutorialStep() {
         }
     };
 
-    // If it's the first step, apply immediately (no fade out/in sequence)
-    // The box itself is fading in, so text doesn't need to double-fade
-    if (currentStepIndex === 0) {
+    // If animation is disabled (e.g. first open), apply immediately
+    if (!animate) {
         if (tutorialText) tutorialText.classList.remove('fade-out');
         applyStep();
         return;
@@ -5869,7 +5869,7 @@ function updateTutorialStep() {
         setTimeout(() => {
             applyStep();
             tutorialText.classList.remove('fade-out');
-        }, 200);
+        }, 250);
     } else {
         applyStep();
     }
@@ -5881,7 +5881,7 @@ function startTutorial() {
     tutorialOverlay.setAttribute('aria-hidden', 'false');
     tutorialBox.classList.add('active');
     tutorialBox.setAttribute('aria-hidden', 'false');
-    updateTutorialStep();
+    updateTutorialStep(false);
 }
 
 function endTutorial() {
@@ -6495,68 +6495,15 @@ if (tutorialLearnMore) {
                     <h2>Main Controls Reference</h2>
                     <p>These controls allow you to manually tune the physical parameters of the laser source, the sailcraft, and the simulation environment.</p>
 
-                    <h3 style="color:#fff; margin-top:30px;">Preset Defaults (Editable via Laser/Sail)</h3>
-                    <p>These values load from the mission preset, but you can override them in the Laser and Sail panels.</p>
-                    <table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:8px;">
-                        <thead>
-                            <tr>
-                                <th style="text-align:left; padding:6px; border-bottom:1px solid #333; color:#ccc;">Property</th>
-                                <th style="text-align:left; padding:6px; border-bottom:1px solid #333; color:#ccc;">XERIONYX (Ablative)</th>
-                                <th style="text-align:left; padding:6px; border-bottom:1px solid #333; color:#ccc;">STARSHOT (Dielectric)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Emissivity (ε)</td>
-                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">0.92</td>
-                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">0.01</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Absorptance model</td>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Derived from reflectance</td>
-                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">Fixed 1e-8</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Atmospheric transmission (zenith)</td>
-                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">0.6</td>
-                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">0.7</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Beam model default</td>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Incoherent / geometric</td>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Diffraction-limited</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Coupling model default</td>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Manual Cm</td>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Radiation pressure (auto)</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Destruction temp limit (K)</td>
-                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">5000</td>
-                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">625</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Max irradiance limit</td>
-                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">8.0e9 W/m²</td>
-                                <td style="padding:6px; border-bottom:1px solid #222;">Auto from temp limit</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px;">Beam quality (Strehl)</td>
-                                <td style="padding:6px; font-family:monospace;">0.85</td>
-                                <td style="padding:6px; font-family:monospace;">0.85</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px;">Spot size floor (W_FLOOR)</td>
-                                <td style="padding:6px; font-family:monospace;">1e-4 m</td>
-                                <td style="padding:6px; font-family:monospace;">1e-4 m</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
                     <h3 style="color:#fff; margin-top:30px;">Laser Parameters</h3>
                     <p><strong>Power (MW):</strong> The total optical power output from the laser source. Higher power increases thrust but also raises the sail's temperature.</p>
                     <p><strong>Aperture Diameter (m):</strong> The diameter of the final transmitting lens or mirror. A larger aperture creates a tighter focus over longer distances due to reduced diffraction.</p>
+                    <p><strong>Beam Divergence (mrad):</strong> The half-angle spread of the beam. Lower divergence keeps the beam tight and boosts power on target at long range.</p>
+                    <p><strong>Diffraction Beam (toggle):</strong> When ON, divergence is computed from aperture + wavelength (diffraction-limited). When OFF, you can set divergence manually.</p>
+                    <p><strong>Beam Radius at Sail (m):</strong> Manual override for the spot size at the sail. Use this to explore "what if" focusing without changing the optics model.</p>
+                    <p><strong>Atm Transmission (0–1):</strong> Fraction of laser power that survives the atmosphere. Lower values simulate haze, absorption, or poor weather.</p>
+                    <p><strong>Beam Quality (0.05–1):</strong> Optical quality/phase errors. Lower quality widens the spot and reduces P_hit.</p>
+                    <p><strong>Spot Floor (m):</strong> Minimum spot radius to emulate turbulence or seeing limits. The beam cannot shrink below this floor even with perfect optics.</p>
                     
                     <div class="tutorial-info-animation">
                         <canvas id="tutorial-anim-aperture" style="width:100%; height:100%;"></canvas>
@@ -6579,6 +6526,9 @@ if (tutorialLearnMore) {
 
                     <p><strong>Reflectance (0-1):</strong> The fraction of light reflected. <br>
                     <strong>Absorptance:</strong> The rest is absorbed (or transmitted), turning into heat and ablation.</p>
+                    <p><strong>Emissivity (0-1):</strong> How effectively the sail radiates heat away. Higher emissivity helps keep the sail cooler.</p>
+                    <p><strong>Auto Absorptance (toggle):</strong> When ON, absorptance is set to (1 - reflectance). Turn it OFF to manually enter absorptance.</p>
+                    <p><strong>Radiation Coupling (toggle):</strong> Switches between ablative thrust coupling and radiation-pressure thrust derived from reflectance.</p>
 
                     <div class="tutorial-info-animation">
                         <canvas id="tutorial-anim-reflectance" style="width:100%; height:100%;"></canvas>
@@ -6592,10 +6542,16 @@ if (tutorialLearnMore) {
                     </div>
 
                     <p>For <strong>Ablation</strong>, the laser vaporizes a thin layer of material, which jets away at high speed. This "rocket effect" is typically 10-100x stronger than pure radiation pressure (where light simply bounces off).</p>
+                    <p><strong>Temp Limit (K):</strong> Destruction temperature for the active sail. Exceeding this indicates failure.</p>
+                    <p><strong>Max I_peak (W/m²):</strong> Upper bound on peak irradiance allowed at the sail. Keeps the beam intensity within material limits.</p>
+                    <p><strong>Auto I_limit (toggle):</strong> When ON, Max I_peak is derived from the temperature limit. Turn OFF to set it manually.</p>
                     
                     <h3 style="color:#fff; margin-top:30px;">Simulation & Mass</h3>
                     <p><strong>Time Speed (x):</strong> Multiplies the rate at which time passes in the simulation. High speeds are useful for long-duration coasting.</p>
                     <p><strong>Total Mass (kg):</strong> The combined mass of the sail material and the payload. Mass directly determines acceleration for a given thrust (F=ma).</p>
+                    <p><strong>Sail Diameter (m):</strong> Sets the sail's physical size, which controls how much of the beam is intercepted.</p>
+                    <p><strong>Start Altitude (m):</strong> Initial height above Earth. Higher starts reduce atmospheric loss and drag effects.</p>
+                    <p><strong>Pause / Start Laser / Restart:</strong> Pause freezes time, Start Laser toggles thrust on/off, and Restart resets position and velocity without changing your settings.</p>
                 `;
         } else {
             tutorialInfoContent.innerHTML = `
@@ -6638,6 +6594,15 @@ if (tutorialLearnMore) {
                 <p>This allows for near-instantaneous tracking of fast-moving objects, like our laser sail, across the sky. An incoherent system would require massive, slow mechanical mirrors to achieve the same result.</p>
             `;
         }
+
+        if (tutorialInfoScroll) {
+            tutorialInfoScroll.scrollTop = 0;
+        }
+        tutorialInfoBox.scrollTop = 0;
+        requestAnimationFrame(() => {
+            if (tutorialInfoScroll) tutorialInfoScroll.scrollTop = 0;
+            tutorialInfoBox.scrollTop = 0;
+        });
 
         tutorialInfoBox.classList.add('active');
         tutorialInfoBox.setAttribute('aria-hidden', 'false');
