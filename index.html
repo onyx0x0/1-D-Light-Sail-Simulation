@@ -991,6 +991,16 @@
             overflow: visible !important; /* Allow dropdowns to pop out */
         }
 
+        body.is-mobile #plot-island .plot-controls {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        body.is-mobile #plot-island .plot-download {
+            grid-column: 1 / -1;
+            width: 100%;
+            justify-self: stretch;
+        }
+
         /* Let Extra Control shrink to fit content */
         body.is-mobile #extra-island.is-open,
         body.is-mobile #extra-island.is-closing {
