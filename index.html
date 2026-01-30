@@ -569,6 +569,74 @@
             display: flex;
             justify-content: center;
         }
+        .toggle-row {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+            padding-top: 4px;
+        }
+        .toggle-subfield {
+            width: 100%;
+        }
+        .toggle-subfield.is-hidden {
+            display: none;
+        }
+        .toggle-label {
+            font-size: 0.7em;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            text-align: center;
+            width: 100%;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 46px;
+            height: 24px;
+            border-radius: 999px;
+            cursor: pointer;
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            align-self: center;
+        }
+        .toggle-switch input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+            pointer-events: none;
+        }
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            border-radius: 999px;
+            border: 1px solid #333;
+            background: #141414;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        .toggle-knob {
+            position: absolute;
+            top: 3px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #cfcfcf;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+        .toggle-switch input:checked + .toggle-track {
+            background: #1c3325;
+            border-color: #2f4a36;
+        }
+        .toggle-switch input:checked + .toggle-track + .toggle-knob {
+            transform: translateX(24px);
+            background: #eafff0;
+        }
         label { display: block; font-size: 0.8em; color: #aaa; margin-bottom: 5px; }
         input[type="number"] { width: 100%; }
 
@@ -582,6 +650,10 @@
             grid-template-columns: repeat(2, var(--control-box-width));
             width: max-content;
             align-content: start;
+            grid-auto-flow: row dense;
+        }
+        #controls-island .control-grid .control-box.is-hidden {
+            display: none;
         }
 
         #controls-island .control-grid--single {
@@ -1264,11 +1336,13 @@
             margin-left: 0;
         }
 
-        .control-box label {
+        .control-box label:not(.toggle-switch) {
             font-size: 0.75em;
             margin-bottom: 6px;
             max-width: 160px;
             white-space: normal;
+            text-align: center;
+            width: 100%;
         }
 
         .control-box input[type="number"] {
@@ -1838,6 +1912,8 @@
             font-size: 0.75em;
             color: #aaa;
             margin-bottom: 4px;
+            text-align: center;
+            width: 100%;
         }
 
 
@@ -2317,8 +2393,8 @@
         <button type="button" class="nav-btn" id="nav-extra">Extra Control</button>
     </div>
     <div class="controls-layout">
-        <div class="controls-panel">
-            <div class="panel-title" data-tip="Laser controls the beamer output and optics that shape the beam.">Laser</div>
+            <div class="controls-panel">
+                <div class="panel-title" data-tip="Laser controls the beamer output and optics that shape the beam.">Laser</div>
             <div class="control-grid control-grid--single">
                 <div class="control-box">
                     <label class="control-tip" data-tip="Laser output power at the source in megawatts.">Power (<span id="p-mode">emit</span>) (MW)</label>
@@ -2369,6 +2445,26 @@
                             <button type="button" class="stepper-btn" data-dir="-1">v</button>
                         </div>
                     </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label control-tip" data-tip="Use diffraction-limited beam model.">Diffraction Beam</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="diffraction-toggle">
+                            <span class="toggle-track"></span>
+                            <span class="toggle-knob"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="control-box">
+                    <label class="control-tip" data-tip="Atmospheric transmission at zenith (0 to 1).">Atm Transmission (0-1)</label>
+                    <input type="number" id="transmission-input" min="0" max="1" step="0.001" value="0.6" data-precision="3">
+                </div>
+                <div class="control-box">
+                    <label class="control-tip" data-tip="Beam quality (Strehl-like). Lower values spread the spot.">Beam Quality (0.05-1)</label>
+                    <input type="number" id="beam-quality-input" min="0.05" max="1" step="0.01" value="0.85" data-precision="2">
+                </div>
+                <div class="control-box">
+                    <label class="control-tip" data-tip="Minimum spot radius floor to emulate turbulence/seeing.">Spot Floor (m)</label>
+                    <input type="number" id="spot-floor-input" min="0" max="10" step="0.0001" value="0.0001" data-precision="auto">
                 </div>
             </div>
         </div>
@@ -2431,10 +2527,54 @@
                             <button type="button" class="stepper-btn" data-dir="-1">v</button>
                         </div>
                     </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label control-tip" data-tip="Use radiation-pressure coupling (auto from reflectance).">Radiation Coupling</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="radiation-toggle">
+                            <span class="toggle-track"></span>
+                            <span class="toggle-knob"></span>
+                        </label>
+                    </div>
                 </div>
                 <div class="control-box">
                     <label for="reflectance-input" class="control-tip" data-tip="Fraction of laser power reflected by the sail (0 to 1).">Reflectance (0-1)</label>
                     <input type="number" id="reflectance-input" min="0" max="1" step="0.0001" value="0.1" data-precision="4">
+                </div>
+                <div class="control-box">
+                    <label class="control-tip" data-tip="Thermal emissivity of the sail surface (0 to 1).">Emissivity (0-1)</label>
+                    <input type="number" id="emissivity-input" min="0" max="1" step="0.001" value="0.92" data-precision="3">
+                </div>
+                <div class="control-box" id="absorptance-box">
+                    <label class="control-tip" data-tip="Fixed absorptance if auto is off (0 to 1).">Absorptance (0-1)</label>
+                    <div class="toggle-row">
+                        <span class="toggle-label control-tip" data-tip="Derive absorptance as (1 - reflectance).">Auto Absorptance</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="absorptance-auto-toggle" checked>
+                            <span class="toggle-track"></span>
+                            <span class="toggle-knob"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-subfield" id="absorptance-input-wrap">
+                        <input type="number" id="absorptance-input" min="0" max="1" step="0.000001" value="0.9" data-precision="auto">
+                    </div>
+                </div>
+                <div class="control-box">
+                    <label class="control-tip" data-tip="Destruction temperature limit for the active sail.">Temp Limit (K)</label>
+                    <input type="number" id="temp-limit-input" min="1" max="10000" step="1" value="5000" data-precision="0">
+                </div>
+                <div class="control-box" id="irradiance-limit-box">
+                    <label class="control-tip" data-tip="Maximum allowed peak irradiance (W/m²).">Max I_peak (W/m²)</label>
+                    <div class="toggle-row">
+                        <span class="toggle-label control-tip" data-tip="Auto-compute max irradiance limit from temp limit.">Auto I_limit</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="irradiance-auto-toggle" checked>
+                            <span class="toggle-track"></span>
+                            <span class="toggle-knob"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-subfield" id="irradiance-input-wrap">
+                        <input type="number" id="irradiance-limit-input" min="0" max="1e13" step="1e6" value="8e9" data-precision="auto">
+                    </div>
                 </div>
                 <div class="control-box">
                     <label class="control-tip" data-tip="Total sailcraft mass in kilograms (sail + payload).">Total Mass (kg)</label>
@@ -2668,6 +2808,9 @@ let atmTransmissionZenith = ATM_TRANSMISSION_ZENITH;
 let absorptanceFromReflectance = true;
 let maxIrradianceLimit = I_MAX;
 let tempLimitK = T_MAX;
+let autoIrradianceLimit = false;
+let beamQuality = BEAM_QUALITY;
+let wFloor = W_FLOOR;
 let sailDiameter = DIAMETER;
 let sailRadius = RS;
 let sailArea = SAIL_AREA;
@@ -2694,7 +2837,7 @@ let energyHitJ = 0;
 let energyAbsJ = 0;
 let inputHold = false;
 let lastTelemetry = null;
-let lastPhysResult = { wEff: W_FLOOR, rho: RHO0 };
+let lastPhysResult = { wEff: wFloor, rho: RHO0 };
 const plotSamples = [];
 let lastPlotSampleTime = -1;
 const PLOT_SAMPLE_DT = 0.02;
@@ -2847,6 +2990,19 @@ const divInput = document.getElementById('div-input');
 const divLabel = document.getElementById('div-label');
 const massInput = document.getElementById('mass-input');
 const reflectanceInput = document.getElementById('reflectance-input');
+const emissivityInput = document.getElementById('emissivity-input');
+const transmissionInput = document.getElementById('transmission-input');
+const beamQualityInput = document.getElementById('beam-quality-input');
+const spotFloorInput = document.getElementById('spot-floor-input');
+const tempLimitInput = document.getElementById('temp-limit-input');
+const irradianceLimitInput = document.getElementById('irradiance-limit-input');
+const irradianceAutoToggle = document.getElementById('irradiance-auto-toggle');
+const irradianceInputWrap = document.getElementById('irradiance-input-wrap');
+const absorptanceInput = document.getElementById('absorptance-input');
+const absorptanceAutoToggle = document.getElementById('absorptance-auto-toggle');
+const absorptanceInputWrap = document.getElementById('absorptance-input-wrap');
+const diffractionToggle = document.getElementById('diffraction-toggle');
+const radiationToggle = document.getElementById('radiation-toggle');
 const couplingModeSelect = document.getElementById('coupling-mode');
 const couplingTargetInput = document.getElementById('coupling-target');
 const couplingTargetLabel = document.getElementById('coupling-target-label');
@@ -2973,7 +3129,7 @@ function updateSailControlUi() {
 function computeDiffractionDivergenceMrad() {
     const aperture = Math.max(apertureD, 1e-9);
     const airyBase = 1.22 * LAMBDA / aperture;
-    const factor = USE_AIRY_MODEL ? 1 : (1.05 / Math.sqrt(Math.max(BEAM_QUALITY, 1e-9)));
+    const factor = USE_AIRY_MODEL ? 1 : (1.05 / Math.sqrt(Math.max(beamQuality, 1e-9)));
     return airyBase * factor * 1000;
 }
 
@@ -3000,7 +3156,111 @@ function applyReflectance(value) {
     reflectance = clamp01(value);
     if (absorptanceFromReflectance) {
         absorptance = clamp01(1 - reflectance);
+        if (absorptanceInput) {
+            setNumberInputValue(absorptanceInput, absorptance, true);
+        }
+        if (autoIrradianceLimit) {
+            maxIrradianceLimit = tempLimitedIrradiance(tempLimitK);
+        }
     }
+    syncRadiationCoupling();
+}
+
+function applyEmissivity(value) {
+    if (!Number.isFinite(value)) return;
+    emissivity = clamp01(value);
+    if (autoIrradianceLimit) {
+        maxIrradianceLimit = tempLimitedIrradiance(tempLimitK);
+    }
+}
+
+function applyTransmission(value) {
+    if (!Number.isFinite(value)) return;
+    atmTransmissionZenith = clamp01(value);
+}
+
+function applyBeamQuality(value) {
+    if (!Number.isFinite(value)) return;
+    beamQuality = clampValue(value, 0.05, 1);
+    syncDiffractionDivergence();
+}
+
+function applySpotFloor(value) {
+    if (!Number.isFinite(value)) return;
+    wFloor = Math.max(0, value);
+    if (lastPhysResult) {
+        lastPhysResult.wEff = Math.max(lastPhysResult.wEff, wFloor);
+    }
+}
+
+function applyTempLimit(value) {
+    if (!Number.isFinite(value)) return;
+    tempLimitK = Math.max(1, value);
+    if (autoIrradianceLimit) {
+        maxIrradianceLimit = tempLimitedIrradiance(tempLimitK);
+    }
+}
+
+function applyMaxIrradiance(value) {
+    if (!Number.isFinite(value)) return;
+    maxIrradianceLimit = Math.max(0, value);
+}
+
+function applyAbsorptance(value) {
+    if (!Number.isFinite(value)) return;
+    absorptance = clamp01(value);
+    if (useRadiationCoupling) {
+        syncRadiationCoupling();
+    }
+    if (autoIrradianceLimit) {
+        maxIrradianceLimit = tempLimitedIrradiance(tempLimitK);
+    }
+}
+
+function updateAbsorptanceUi() {
+    if (!absorptanceAutoToggle || !absorptanceInput) return;
+    absorptanceFromReflectance = absorptanceAutoToggle.checked;
+    if (absorptanceFromReflectance) {
+        absorptance = clamp01(1 - reflectance);
+        absorptanceInput.disabled = true;
+        setNumberInputValue(absorptanceInput, absorptance, true);
+        if (absorptanceInputWrap) absorptanceInputWrap.classList.add("is-hidden");
+    } else {
+        absorptanceInput.disabled = false;
+        if (absorptanceInputWrap) absorptanceInputWrap.classList.remove("is-hidden");
+        applyAbsorptance(parseFloat(absorptanceInput.value));
+    }
+    syncRadiationCoupling();
+}
+
+function updateIrradianceUi() {
+    if (!irradianceAutoToggle) return;
+    autoIrradianceLimit = irradianceAutoToggle.checked;
+    if (autoIrradianceLimit) {
+        maxIrradianceLimit = tempLimitedIrradiance(tempLimitK);
+        if (irradianceLimitInput) {
+            setNumberInputValue(irradianceLimitInput, maxIrradianceLimit, true);
+            irradianceLimitInput.disabled = true;
+        }
+        if (irradianceInputWrap) irradianceInputWrap.classList.add("is-hidden");
+    } else {
+        if (irradianceLimitInput) {
+            irradianceLimitInput.disabled = false;
+            applyMaxIrradiance(parseFloat(irradianceLimitInput.value));
+        }
+        if (irradianceInputWrap) irradianceInputWrap.classList.remove("is-hidden");
+    }
+}
+
+function applyDiffractionToggle(value) {
+    useDiffractionBeam = !!value;
+    divergenceLocked = useDiffractionBeam;
+    syncDiffractionDivergence();
+}
+
+function applyRadiationToggle(value) {
+    useRadiationCoupling = !!value;
+    updateSailControlUi();
     syncRadiationCoupling();
 }
 
@@ -3084,6 +3344,8 @@ const missionPresets = {
         reflectance: 0.1,
         absorptance: 0.9,
         emissivity: EPS_RAD,
+        beamQuality: BEAM_QUALITY,
+        wFloor: W_FLOOR,
         transmission: ATM_TRANSMISSION_ZENITH,
         absorptanceFromReflectance: true,
         maxIrradiance: I_MAX,
@@ -3105,6 +3367,8 @@ const missionPresets = {
         reflectance: 0.7,
         absorptance: 1e-8,
         emissivity: 0.01,
+        beamQuality: BEAM_QUALITY,
+        wFloor: W_FLOOR,
         transmission: 0.7,
         absorptanceFromReflectance: false,
         maxIrradiance: "auto",
@@ -3251,6 +3515,8 @@ function applyMissionPreset(key) {
     useRadiationCoupling = preset.useRadiationCoupling;
     absorptanceFromReflectance = preset.absorptanceFromReflectance ?? absorptanceFromReflectance;
     emissivity = preset.emissivity ?? emissivity;
+    beamQuality = preset.beamQuality ?? beamQuality;
+    wFloor = preset.wFloor ?? wFloor;
     atmTransmissionZenith = preset.transmission ?? atmTransmissionZenith;
     if (Number.isFinite(preset.tempLimitK)) {
         tempLimitK = preset.tempLimitK;
@@ -3271,6 +3537,11 @@ function applyMissionPreset(key) {
     }
     setNumberInputValue(beamRadiusInput, preset.beamRadiusOverride);
     setNumberInputValue(reflectanceInput, preset.reflectance);
+    if (emissivityInput) setNumberInputValue(emissivityInput, emissivity, true);
+    if (transmissionInput) setNumberInputValue(transmissionInput, atmTransmissionZenith, true);
+    if (beamQualityInput) setNumberInputValue(beamQualityInput, beamQuality, true);
+    if (spotFloorInput) setNumberInputValue(spotFloorInput, wFloor, true);
+    if (tempLimitInput) setNumberInputValue(tempLimitInput, tempLimitK, true);
 
     reflectance = clamp01(preset.reflectance);
     if (absorptanceFromReflectance) {
@@ -3279,13 +3550,24 @@ function applyMissionPreset(key) {
         absorptance = clamp01(preset.absorptance);
     }
     if (preset.maxIrradiance === "auto") {
+        autoIrradianceLimit = true;
         maxIrradianceLimit = tempLimitedIrradiance(preset.tempLimitK);
     } else if (Number.isFinite(preset.maxIrradiance)) {
+        autoIrradianceLimit = false;
         maxIrradianceLimit = preset.maxIrradiance;
     } else {
+        autoIrradianceLimit = false;
         maxIrradianceLimit = Infinity;
     }
     syncRadiationCoupling();
+    if (absorptanceInput) setNumberInputValue(absorptanceInput, absorptance, true);
+    if (irradianceLimitInput) setNumberInputValue(irradianceLimitInput, maxIrradianceLimit, true);
+    if (absorptanceAutoToggle) absorptanceAutoToggle.checked = absorptanceFromReflectance;
+    if (irradianceAutoToggle) irradianceAutoToggle.checked = autoIrradianceLimit;
+    if (diffractionToggle) diffractionToggle.checked = useDiffractionBeam;
+    if (radiationToggle) radiationToggle.checked = useRadiationCoupling;
+    updateAbsorptanceUi();
+    updateIrradianceUi();
 
     updateSailControlUi();
     syncDiffractionDivergence();
@@ -3345,6 +3627,19 @@ function setupNumberControls() {
                     }
                 }
             }
+            if (input === emissivityInput || input === transmissionInput || input === beamQualityInput
+                || input === spotFloorInput || input === tempLimitInput || input === irradianceLimitInput
+                || input === absorptanceInput) {
+                const minAttr = parseFloat(input.getAttribute("min"));
+                const maxAttr = parseFloat(input.getAttribute("max"));
+                const value = parseFloat(input.value);
+                if (Number.isFinite(value)) {
+                    const clamped = clampValue(value, minAttr, maxAttr);
+                    if (clamped !== value) {
+                        input.value = clamped;
+                    }
+                }
+            }
             if (input === altitudeSlider) {
                 const value = parseFloat(input.value);
                 if (!Number.isFinite(value) && input.value.trim() === "-") {
@@ -3376,6 +3671,27 @@ function setupNumberControls() {
                 applySailDiameter(parseFloat(input.value));
             } else if (input === couplingTargetInput) {
                 applyCouplingTarget(parseFloat(input.value));
+            } else if (input === emissivityInput) {
+                applyEmissivity(parseFloat(input.value));
+            } else if (input === transmissionInput) {
+                applyTransmission(parseFloat(input.value));
+            } else if (input === beamQualityInput) {
+                applyBeamQuality(parseFloat(input.value));
+            } else if (input === spotFloorInput) {
+                applySpotFloor(parseFloat(input.value));
+            } else if (input === tempLimitInput) {
+                applyTempLimit(parseFloat(input.value));
+                if (autoIrradianceLimit) {
+                    updateIrradianceUi();
+                }
+            } else if (input === irradianceLimitInput) {
+                if (!autoIrradianceLimit) {
+                    applyMaxIrradiance(parseFloat(input.value));
+                }
+            } else if (input === absorptanceInput) {
+                if (!absorptanceFromReflectance) {
+                    applyAbsorptance(parseFloat(input.value));
+                }
             }
         });
         input.addEventListener("blur", () => {
@@ -3444,7 +3760,37 @@ function setupNumberControls() {
 setupNumberControls();
 updateSailControlUi();
 syncDiffractionDivergence();
+if (emissivityInput) setNumberInputValue(emissivityInput, emissivity, true);
+if (transmissionInput) setNumberInputValue(transmissionInput, atmTransmissionZenith, true);
+if (beamQualityInput) setNumberInputValue(beamQualityInput, beamQuality, true);
+if (spotFloorInput) setNumberInputValue(spotFloorInput, wFloor, true);
+if (tempLimitInput) setNumberInputValue(tempLimitInput, tempLimitK, true);
+if (irradianceLimitInput) setNumberInputValue(irradianceLimitInput, maxIrradianceLimit, true);
+if (absorptanceInput) setNumberInputValue(absorptanceInput, absorptance, true);
+if (diffractionToggle) diffractionToggle.checked = useDiffractionBeam;
+if (radiationToggle) radiationToggle.checked = useRadiationCoupling;
+if (absorptanceAutoToggle) absorptanceAutoToggle.checked = absorptanceFromReflectance;
+if (irradianceAutoToggle) irradianceAutoToggle.checked = autoIrradianceLimit;
+updateAbsorptanceUi();
+updateIrradianceUi();
 formatAllNumberInputs();
+
+if (absorptanceAutoToggle) {
+    absorptanceAutoToggle.addEventListener("change", updateAbsorptanceUi);
+}
+if (irradianceAutoToggle) {
+    irradianceAutoToggle.addEventListener("change", updateIrradianceUi);
+}
+if (diffractionToggle) {
+    diffractionToggle.addEventListener("change", () => {
+        applyDiffractionToggle(diffractionToggle.checked);
+    });
+}
+if (radiationToggle) {
+    radiationToggle.addEventListener("change", () => {
+        applyRadiationToggle(radiationToggle.checked);
+    });
+}
 
 if (escapeToggleBtn) {
     escapeToggleBtn.addEventListener("click", () => {
@@ -3524,10 +3870,13 @@ function showControlTooltip(target) {
 
 }
 
+let tooltipPinnedTarget = null;
+
 function hideControlTooltip() {
     if (!controlTooltip) return;
     controlTooltip.classList.remove("is-visible");
     controlTooltip.setAttribute("aria-hidden", "true");
+    tooltipPinnedTarget = null;
 }
 
 document.querySelectorAll(".control-tip[data-tip]").forEach((el) => {
@@ -3536,6 +3885,26 @@ document.querySelectorAll(".control-tip[data-tip]").forEach((el) => {
     el.addEventListener("focus", () => showControlTooltip(el));
     el.addEventListener("blur", hideControlTooltip);
 });
+
+document.querySelectorAll(".telemetry-row[data-tip]").forEach((el) => {
+    el.addEventListener("click", (event) => {
+        if (!document.body.classList.contains('is-mobile')) return;
+        event.stopPropagation();
+        if (tooltipPinnedTarget === el) {
+            hideControlTooltip();
+        } else {
+            tooltipPinnedTarget = el;
+            showControlTooltip(el);
+        }
+    });
+});
+
+document.addEventListener("click", (event) => {
+    if (!tooltipPinnedTarget) return;
+    if (event.target.closest(".telemetry-row[data-tip]")) return;
+    hideControlTooltip();
+});
+document.addEventListener("scroll", hideControlTooltip, { passive: true, capture: true });
 
 const selectDropdowns = new Map();
 const dropdownRegistry = [];
@@ -4576,7 +4945,7 @@ function gaussianSpot(zRange, aperture) {
     // Option A: Gaussian-equivalent matched to Airy first-zero energy (0.838 encircled)
     const r1 = 1.22 * LAMBDA * zRange / aperture;
     const w = 1.05 * r1; // 1/e^2 radius that matches Airy encircled energy
-    const wEff = Math.max(w / Math.sqrt(BEAM_QUALITY), W_FLOOR);
+    const wEff = Math.max(w / Math.sqrt(Math.max(beamQuality, 1e-9)), wFloor);
     const fHit = 1 - Math.exp(-2 * sailRadius * sailRadius / (wEff * wEff));
     return { wEff, fHit: Math.min(1, Math.max(0, fHit)) };
 }
@@ -4585,7 +4954,7 @@ function airySpot(zRange, aperture) {
     const r1 = 1.22 * LAMBDA * zRange / aperture;
     const x = Math.PI * aperture * sailRadius / (LAMBDA * zRange);
     const fHit = 1 - (besselJ0(x) ** 2 + besselJ1(x) ** 2);
-    const wEff = Math.max(r1 / Math.sqrt(BEAM_QUALITY), W_FLOOR);
+    const wEff = Math.max(r1 / Math.sqrt(Math.max(beamQuality, 1e-9)), wFloor);
     return { wEff, fHit: Math.min(1, Math.max(0, fHit)) };
 }
 
@@ -5952,7 +6321,7 @@ if (tutorialLearnMore) {
                     ctxPoint.fillRect(sourceX - 10, sourceY - 10, 20, 20);
                     
                     // Draw Target (Size scales 1/dist to simulate perspective, though 2D)
-                    const size = 20 * (1 - distT * 0.6);
+                    const size = 12 * (1 - distT * 0.6);
                     ctxPoint.fillStyle = '#eee';
                     ctxPoint.beginPath();
                     ctxPoint.arc(targetX, sourceY, size, 0, Math.PI*2);
@@ -6109,6 +6478,65 @@ if (tutorialLearnMore) {
             tutorialInfoContent.innerHTML = `
                     <h2>Main Controls Reference</h2>
                     <p>These controls allow you to manually tune the physical parameters of the laser source, the sailcraft, and the simulation environment.</p>
+
+                    <h3 style="color:#fff; margin-top:30px;">Preset Defaults (Editable via Laser/Sail)</h3>
+                    <p>These values load from the mission preset, but you can override them in the Laser and Sail panels.</p>
+                    <table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:8px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left; padding:6px; border-bottom:1px solid #333; color:#ccc;">Property</th>
+                                <th style="text-align:left; padding:6px; border-bottom:1px solid #333; color:#ccc;">XERIONYX (Ablative)</th>
+                                <th style="text-align:left; padding:6px; border-bottom:1px solid #333; color:#ccc;">STARSHOT (Dielectric)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Emissivity (ε)</td>
+                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">0.92</td>
+                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">0.01</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Absorptance model</td>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Derived from reflectance</td>
+                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">Fixed 1e-8</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Atmospheric transmission (zenith)</td>
+                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">0.6</td>
+                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">0.7</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Beam model default</td>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Incoherent / geometric</td>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Diffraction-limited</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Coupling model default</td>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Manual Cm</td>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Radiation pressure (auto)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Destruction temp limit (K)</td>
+                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">5000</td>
+                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">625</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Max irradiance limit</td>
+                                <td style="padding:6px; border-bottom:1px solid #222; font-family:monospace;">8.0e9 W/m²</td>
+                                <td style="padding:6px; border-bottom:1px solid #222;">Auto from temp limit</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px;">Beam quality (Strehl)</td>
+                                <td style="padding:6px; font-family:monospace;">0.85</td>
+                                <td style="padding:6px; font-family:monospace;">0.85</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px;">Spot size floor (W_FLOOR)</td>
+                                <td style="padding:6px; font-family:monospace;">1e-4 m</td>
+                                <td style="padding:6px; font-family:monospace;">1e-4 m</td>
+                            </tr>
+                        </tbody>
+                    </table>
 
                     <h3 style="color:#fff; margin-top:30px;">Laser Parameters</h3>
                     <p><strong>Power (MW):</strong> The total optical power output from the laser source. Higher power increases thrust but also raises the sail's temperature.</p>
