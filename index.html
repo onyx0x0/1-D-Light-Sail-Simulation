@@ -57,20 +57,20 @@
         .page-loader {
             position: fixed;
             inset: 0;
-            background: #050505;
+            background: #000000;
             display: grid;
             place-items: center;
             z-index: 9999;
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            transition: opacity 0.2s ease, visibility 0.2s ease;
-        }
-
-        .page-loader.is-visible {
             opacity: 1;
             visibility: visible;
             pointer-events: auto;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .page-loader.is-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
         }
 
         .page-loader-content {
@@ -90,8 +90,8 @@
 
         .page-loader-text {
             font-size: 12px;
-            color: #cfcfcf;
-            letter-spacing: 0.08em;
+            color: #ffffff;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
         }
 
@@ -2332,10 +2332,10 @@
 
 <button id="tutorial-btn" type="button">Tutorial</button>
 
-<div id="page-loader" class="page-loader" aria-hidden="true">
+<div id="page-loader" class="page-loader" aria-hidden="false">
     <div class="page-loader-content">
         <div class="page-loader-spinner" aria-hidden="true"></div>
-        <div class="page-loader-text">Loading...</div>
+        <div class="page-loader-text">1DLSS</div>
     </div>
 </div>
 
@@ -2911,26 +2911,11 @@ mobileQuery.addEventListener('change', applyMobileClass);
 const pageLoader = document.getElementById('page-loader');
 const loaderState = {
     shownAt: 0,
-    showTimer: null,
     loadFinished: false
 };
 const loaderConfig = {
-    showDelayMs: 120,
-    minVisibleMs: 650
+    minVisibleMs: 500
 };
-
-function areImagesCached() {
-    const images = Array.from(document.images);
-    if (images.length === 0) return true;
-    return images.every((img) => img.complete && img.naturalWidth > 0);
-}
-
-function showPageLoader() {
-    if (!pageLoader || loaderState.shownAt) return;
-    pageLoader.classList.add('is-visible');
-    pageLoader.setAttribute('aria-hidden', 'false');
-    loaderState.shownAt = performance.now();
-}
 
 function removePageLoader() {
     if (pageLoader && pageLoader.parentNode) {
@@ -2938,36 +2923,26 @@ function removePageLoader() {
     }
 }
 
+function showPageLoader() {
+    if (!pageLoader || loaderState.shownAt) return;
+    pageLoader.classList.remove('is-hidden');
+    pageLoader.setAttribute('aria-hidden', 'false');
+    loaderState.shownAt = performance.now();
+}
+
 function hidePageLoader() {
     if (!pageLoader) return;
-    pageLoader.classList.remove('is-visible');
+    pageLoader.classList.add('is-hidden');
     pageLoader.setAttribute('aria-hidden', 'true');
-    window.setTimeout(() => {
-        removePageLoader();
-    }, 220);
+    window.setTimeout(removePageLoader, 260);
 }
 
 function initPageLoader() {
     if (!pageLoader) return;
-    if (areImagesCached()) {
-        removePageLoader();
-        return;
-    }
-    loaderState.showTimer = window.setTimeout(() => {
-        if (!loaderState.loadFinished) {
-            showPageLoader();
-        }
-    }, loaderConfig.showDelayMs);
+    showPageLoader();
     window.addEventListener('load', () => {
         loaderState.loadFinished = true;
         if (!pageLoader) return;
-        if (!loaderState.shownAt) {
-            if (loaderState.showTimer) {
-                window.clearTimeout(loaderState.showTimer);
-            }
-            removePageLoader();
-            return;
-        }
         const elapsed = performance.now() - loaderState.shownAt;
         const remaining = Math.max(0, loaderConfig.minVisibleMs - elapsed);
         window.setTimeout(hidePageLoader, remaining);
